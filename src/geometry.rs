@@ -23,6 +23,28 @@ impl<T> Vector3D<T> {
         self.z
     }
 }
+impl<T: NumCast> Vector3D<T> {
+    // Метод для преобразования типа
+    pub fn cast<U: NumCast>(self) -> Vector3D<U>
+    {
+        Vector3D {
+            x: NumCast::from(self.x).unwrap(),
+            y: NumCast::from(self.y).unwrap(),
+            z: NumCast::from(self.z).unwrap(),
+        }
+    }
+}
+impl<f32> Vector3D<f32> 
+where f32: NumCast + Float{
+    pub fn round<U: NumCast>(self) -> Vector3D<U>
+    {
+        Vector3D {
+            x: NumCast::from(self.x.round()).unwrap(),
+            y: NumCast::from(self.y.round()).unwrap(),
+            z: NumCast::from(self.z.round()).unwrap(),
+        }
+    }
+}
 impl<T> Vector3D<T> 
 where T: Copy + Add<Output = T> + Mul<Output = T> + Float + Copy {
     pub fn norm(self) -> T

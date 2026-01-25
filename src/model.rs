@@ -22,9 +22,9 @@ impl Model {
 
                 verticates.push(
                     Vector3D::new(
-                        -parts[1].parse::<f32>().unwrap(), 
-                        -parts[2].parse::<f32>().unwrap(), 
-                        -parts[3].parse::<f32>().unwrap() 
+                        parts[1].parse::<f32>().unwrap(), 
+                        parts[2].parse::<f32>().unwrap(), 
+                        parts[3].parse::<f32>().unwrap() 
                     )
                 );
             } else if (line.starts_with("f ")) {
