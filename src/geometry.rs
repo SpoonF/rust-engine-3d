@@ -146,7 +146,16 @@ impl<T: NumCast> Vector2D<T> {
         }
     }
 }
-
+impl<f32> Vector2D<f32> 
+where f32: NumCast + Float{
+    pub fn round<U: NumCast>(self) -> Vector2D<U>
+    {
+        Vector2D {
+            x: NumCast::from(self.x.round()).unwrap(),
+            y: NumCast::from(self.y.round()).unwrap(),
+        }
+    }
+}
 impl<T: Add<Output = T>> Add for Vector2D<T> {
     type Output = Vector2D<T>;
 
