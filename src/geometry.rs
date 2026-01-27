@@ -1,4 +1,4 @@
-use std::ops::{Add, BitXor, Mul, Sub};
+use std::ops::{Add, BitXor, Index, IndexMut, Mul, Sub};
 
 use num::{Float, NumCast};
 
@@ -21,6 +21,37 @@ impl<T> Vector3D<T> {
     }
     pub fn z(self) -> T {
         self.z
+    }
+    fn _get_by_index(&self, index: usize) -> &T {
+
+        match index {
+            0 => &self.x,
+            1 => &self.y,
+            2 => &self.z,
+            _ => panic!("Undefinded index {} in Vector3D", index)
+        }
+    }
+
+    fn _get_by_index_mut(&mut self, index: usize) -> &mut T {
+
+        match index {
+            0 => &mut self.x,
+            1 => &mut self.y,
+            2 => &mut self.z,
+            _ => panic!("Undefinded index {} in Vector3D", index)
+        }
+    }
+}
+impl<T> Index<usize> for Vector3D<T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &T {
+        self._get_by_index(index)
+    }
+}
+impl<T> IndexMut<usize> for Vector3D<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self._get_by_index_mut(index)
     }
 }
 impl<T: NumCast> Vector3D<T> {
@@ -114,6 +145,16 @@ where T: Mul<Output = T> + Sub<Output = T> + Copy
     }
 }
 
+impl Vector3D<f32> {
+    pub fn from(m: Matrix) -> Vector3D<f32> {
+        Vector3D::new(
+            m[0][0]/m[3][0], 
+            m[1][0]/m[3][0], 
+            m[2][0]/m[3][0]
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Vector2D<T> {
     pub x: T,
@@ -196,5 +237,139 @@ impl<T: BitXor + Mul<Output = T> + Sub<Output = T> + Copy> BitXor for Vector2D<T
             x: self.y * other.x - self.x * other.y,
             y: self.y * other.x - self.x * other.y,
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct Matrix {
+    matrix: Vec<Vec<f32>>,
+    rows: i32,
+    cols: i32,
+}
+
+impl Matrix {
+    pub fn new(rows: i32, cols: i32) -> Matrix{
+        Matrix { 
+            matrix: vec![vec![0.0; cols as usize]; rows as usize], 
+            rows, 
+            cols
+        }
+    }
+    pub fn identity(dimensions: i32) -> Matrix {
+        let mut m = Matrix::new(dimensions, dimensions);
+        for i in 0..dimensions as usize {
+            for j in 0..dimensions as usize {
+                m[i][j] = if i == j { 1.0 } else { 0.0 }
+            }
+        }
+
+        m
+    }
+    pub fn nrows(&self) -> i32 {
+        self.rows
+    }
+    pub fn ncols(&self) -> i32 {
+        self.cols
+    }
+    pub fn trunspose(&self) -> Matrix {
+        let mut m = Matrix::new(self.cols, self.rows);
+        for i in  0..self.rows as usize {
+            for j in  0..self.cols as usize {
+                m[j][i] = self[i][i];
+            }
+        }
+        m
+    }
+    pub fn inverse(&mut self) -> Matrix {
+        assert_eq!(self.rows, self.cols);
+
+        let mut m = Matrix::new(self.rows, self.cols * 2);
+
+        for i in  0..self.rows as usize {
+            for j in  0..self.cols as usize {
+                m[i][j] = self[i][j];
+            }
+        }
+        for i in  0..self.rows as usize {
+            m[i][i + self.cols as usize] = 1.0;
+        }
+
+        // first pass
+        for i in 0..(self.rows-1) as usize{
+            // normalize the first row
+            for j in (m.cols-1) as usize..=0 {
+                m[i][j] /= m[i][i];
+            }
+            for k in i + 1..self.rows as usize {
+                let coeff = m[k][i];
+                for j in 0..m.cols as usize {
+                    m[k][j] -= m[i][j]*coeff;
+                }
+            }
+        }
+        // normalize the last row
+        for j in (m.cols-1) as usize..=(self.rows-1) as usize  {
+            m[(self.rows-1) as usize][j] /= m[(self.rows-1) as usize][(self.rows-1) as usize];
+        }
+        // second pass
+        for i in (self.rows-1) as usize..0 {
+            for k in i-1..=0 {
+                let coeff = m[k][i];
+                for j in 0..m.cols as usize {
+                    m[k][j] -= m[i][j]*coeff;
+                }
+            }
+        }
+
+        let mut trancate = Matrix::new(self.rows, self.cols);
+        
+        for i in  0..self.rows as usize {
+            for j in  0..self.cols as usize {
+                trancate[i][j] = m[i][j + self.cols as usize];
+            }
+        }
+        trancate
+    }
+}
+
+impl Index<usize> for Matrix {
+    type Output = Vec<f32>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.matrix[index]
+    }
+}
+impl IndexMut<usize> for Matrix {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.matrix[index]
+    }
+}
+
+impl Mul for Matrix {
+    type Output = Matrix;
+
+    fn mul(self, other: Matrix) -> Self::Output {
+        assert_eq!(self.cols, other.rows);
+        let mut m = Matrix::new(self.rows, other.cols);
+        for i in 0..self.rows as usize {
+            for j in 0..other.cols as usize {
+                m[i][j] = 0.0;
+
+                for k in 0..self.cols as usize {
+                    m[i][j] += self[i][k] * other[k][j];
+                }
+            }
+        }
+        m
+    }
+}
+
+impl Matrix {
+    pub fn from(v: Vector3D<f32>) -> Matrix {
+        let mut m = Matrix::new(4, 1);
+        m[0][0] = v.x;
+        m[1][0] = v.x;
+        m[2][0] = v.x;
+        m
     }
 }

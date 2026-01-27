@@ -9,8 +9,8 @@ pub struct Model {
     pub verticates: Vec<Vector3D<f32>>,
     pub faces: Vec<Vec<Vector3D<i32>>>,
     pub uv: Vec<Vector2D<f32>>,
-    texture: Option<Tga>,
-    pub texture_alt: Option<ImageBuffer<image::Rgb<u8>, Vec<u8>>>,
+    pub norms: Vec<Vector3D<f32>>,
+    pub texture: Option<Tga>
 }
 
 impl Model {
@@ -22,6 +22,7 @@ impl Model {
         let mut verticates = vec![];
         let mut faces = vec![];
         let mut uv = vec![];
+        let mut norms = vec![];
         // println!("{:?}", buffer);
         for line in reader.lines() {
             let line = line.unwrap();
@@ -42,7 +43,7 @@ impl Model {
                 
                 for part in parts {
                     let t: Vec<&str> = part.split("/").collect();
-                    // let xd = t[0].parse::<i32>().unwrap() - 1;
+
                     x.push(Vector3D::new(
                         t[0].parse::<i32>().unwrap() - 1, 
                         t[1].parse::<i32>().unwrap() - 1, 
@@ -59,6 +60,16 @@ impl Model {
                         parts[2].parse::<f32>().unwrap(),
                     )
                 );
+            } else if line.starts_with("vn ") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+
+                norms.push(
+                    Vector3D::new(
+                        parts[1].parse::<f32>().unwrap(), 
+                        parts[2].parse::<f32>().unwrap(),
+                        parts[3].parse::<f32>().unwrap(),
+                    )
+                );
             }
         }
 
@@ -66,24 +77,24 @@ impl Model {
             verticates,
             faces,
             uv,
+            norms,
             texture: None,
-            texture_alt: None
         }
     }
     pub fn read_texture(&mut self, path: &Path) {
-        let mut img = image::open(path).unwrap();
-        let img = img.rotate180();
-        let texture = Tga::read_file(path);
-        let texture_alt = img.to_rgb8();
-        self.texture = Some(texture);
-        self.texture_alt = Some(texture_alt.clone());
+        self.texture = Some(Tga::read_file(path));
         
     }
-    pub fn diffuse(&self, uv: Vector2D<i32>) -> u32 {
+    pub fn diffuse(&self, mut uv: Vector2D<i32>) -> u32 {
         let texture = self.texture.as_ref().unwrap();
-        let x = if uv.x > texture.width() as i32 { texture.width() as i32 - 1 } else { uv.x };
-        let y = if uv.y > texture.height() as i32 { texture.height() as i32 - 1 } else { uv.y };
-        texture.get_pixel(x, y)
+
+        if texture.width() < uv.x as usize {
+            uv.x = (texture.width() - 1) as i32;
+        }
+        if texture.height() < uv.y as usize {
+            uv.y = (texture.height() - 1) as i32;
+        }
+        texture.get_pixel(uv.x, uv.y)
     }
     pub fn uv(&self, iface: i32, nvert: i32) -> Vector2D<i32> {
         let idx = self.faces[iface as usize][nvert as usize].y as usize;
@@ -92,6 +103,11 @@ impl Model {
             self.uv[idx].x * texture.width() as f32,  
             self.uv[idx].y * texture.height() as f32
         ).cast()
+
+    }
+    pub fn norm(&self, iface: i32, nvert: i32) -> Vector3D<f32>{
+        let idx = self.faces[iface as usize][nvert as usize][2];
+        self.norms[idx as usize].normalize(1.0)
     }
 }
 impl std::fmt::Debug for Model {

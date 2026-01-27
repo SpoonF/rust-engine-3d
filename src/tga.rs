@@ -1,7 +1,7 @@
 use std::{fs::File, io::{BufReader, Read}, mem, path::Path};
 #[derive(Clone)]
 pub struct Tga {
-    map: Vec<Vec<u32>>,
+    pub map: Vec<Vec<u32>>,
     width: usize,
     height: usize
 }
@@ -37,8 +37,8 @@ impl Tga {
     	if header.imagedescriptor&0x20 > 0 {
 
             for iy in 0..height/2{
-                for ix in 0..width{
-                    map[ix].swap(iy, height-1-iy);
+                for item in map.iter_mut().take(width){
+                    item.swap(iy, height-1-iy);
                 }
             }
         }
@@ -80,19 +80,19 @@ impl Tga {
         }
     }
 
-    fn create_canvas(xsize: usize, ysize: usize, bytespp: usize, buffer: &Vec<u8>) -> Vec<Vec<u32>>{
-        let mut canvas = vec![vec![0;ysize];xsize];
-        for iy in 0..ysize{
-            for ix in 0..xsize{
+    fn create_canvas(width: usize, height: usize, bytespp: usize, buffer: &Vec<u8>) -> Vec<Vec<u32>>{
+        let mut canvas = vec![vec![0;height];width];
+        for iy in 0..height{
+            for ix in 0..width{
                 if bytespp == 1 {
-                    let intensity = buffer[iy*xsize+ix] as u32;
-                    canvas[ix][iy] = intensity + (intensity << (8*1)) + (intensity << (8*2));
+                    let intensity = buffer[iy*width+ix] as u32;
+                    canvas[ix][iy] = intensity + (intensity << 8) + (intensity << 8);
                 } else if bytespp == 3 {
-                    let bytes = &buffer[(iy*xsize+ix)*3..(iy*xsize+ix+1)*3];
-                    canvas[ix][iy] = bytes[0] as u32 + ((bytes[1] as u32) << (8*1)) + ((bytes[2] as u32) << (8*2));
+                    let bytes = &buffer[(iy*width+ix)*3..(iy*width+ix+1)*3];
+                    canvas[ix][iy] = bytes[0] as u32 + ((bytes[1] as u32) << 8) + ((bytes[2] as u32) << (8*2));
                 } else if bytespp == 4 {
-                    let bytes = &buffer[(iy*xsize+ix)*4..(iy*xsize+ix+1)*4];
-                    canvas[ix][iy] = bytes[0] as u32 + ((bytes[1] as u32) << (8*1)) + ((bytes[2] as u32) << (8*2));
+                    let bytes = &buffer[(iy*width+ix)*4..(iy*width+ix+1)*4];
+                    canvas[ix][iy] = bytes[0] as u32 + ((bytes[1] as u32) << 8) + ((bytes[2] as u32) << (8*2));
                 }
             }
         }
