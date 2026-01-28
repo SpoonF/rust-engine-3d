@@ -67,7 +67,7 @@ impl Scene {
     }
 
     pub fn set(&mut self, x: usize, y: usize, color: u32) {
-        self.scene[x][y] = color
+        self.scene[x][y] = color;
     }
 
     // pub fn line(&mut self, mut p: Vec<Vector2D<i32>>, color: Color) {
@@ -220,14 +220,13 @@ impl Scene {
                 mem::swap(&mut a, &mut b); 
                 mem::swap(&mut itya, &mut ityb)
             };
-
-
             for j in a.x as i32..=b.x as i32 {
                 let phi = if b.x == a.x { 1. } else { (j as f32 - a.x) / (b.x - a.x)};
                 let p: Vector3D<i32> = (a + ((b - a) * phi)).round();
                 let ityp = itya + ((ityb - itya) * phi);
 
                 let idx = (p.x + p.y * self.width as i32) as usize;
+
 
                 if p.x >= self.width as i32 || p.y >= self.height as i32 || p.x < 0 || p.y < 0 {
                     continue;
@@ -242,33 +241,39 @@ impl Scene {
     }
 
 
-    pub fn wait_for_exit(&mut self, action: impl Fn(&mut Scene)) {
+    pub fn wait_for_exit(&mut self, mut action: impl FnMut(&mut Scene, Vec<Keycode>)) {
         let mut event_pump = self.sdl_context.event_pump().unwrap();
         // let mut rng = rand::rng();
-
         'running: loop {
-            action(self);
-            // self.update();
+            let mut keys:Vec<Keycode> = vec![];
+            let mut mouse: Vec<Keycode> = vec![];
+
             for event in event_pump.poll_iter() {
+                
                 match event {
                     Event::Quit { .. } |
                     Event::KeyDown { keycode: Some(Keycode::Escape), ..} => {
                         break 'running;
                     },
+                    Event::KeyDown {keycode: Some(key), ..} => {
+                        keys.push(key);
+                    },
                     _ => {}
                 }
             }
+
+            action(self, keys);
+            self.update();
         }
     }
 }
 
 fn get_color(color: u32, mut intensity: f32) -> u32{
-    intensity = intensity.clamp(0.0, 1.0); 
+    // intensity = intensity.clamp(0.0, 1.0); 
     
     let mut result = color as f32 * intensity;
     result += (color >> 8) as f32 *intensity * 256.0;
     result += (color >> 16) as f32 * intensity  * 256.0 * 256.0;
-    result += (color >> 24) as f32 * intensity  * 256.0 * 256.0 * 255.0;
     result as u32
 }
 fn get_color_from_rgb(color: [u8; 3], intensity: f32) -> u32{
