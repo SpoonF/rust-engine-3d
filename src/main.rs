@@ -35,7 +35,7 @@ fn main() {
     scene.wait_for_exit(|scene: &mut Scene, keycodes| {
 
         let model_view = look_at(eye, center, Vector3D::new(0.0, 1.0, 0.0));
-        let mut projection = Matrix:: identity(4);
+        let mut projection: Matrix<4, 4> = Matrix::identity();
         let viewport = viewport((WIDTH/8) as i32, (HEIGHT/8) as i32, (WIDTH*3/4) as i32, (HEIGHT*3/4) as i32);
         // projection[3][2] = -1./(eye-center).norm();
 
@@ -50,7 +50,7 @@ fn main() {
 
                 let v: Vector3D<f32> = model.verticates[face[j].x as usize];
                 // let set = viewport.clone() * projection.clone() * model_view.clone() * Matrix::from(v);
-                let set = viewport.clone() *  Matrix::from(v);
+                let set = viewport.clone() * Matrix::from(v);
 
                 screen_coords[j] = Vector3D::from(set).cast();
                 world_coords[j] = v;
@@ -62,8 +62,8 @@ fn main() {
     });
 }
 
-fn viewport(x: i32, y: i32, w: i32, h: i32) -> Matrix {
-    let mut m = Matrix::identity(4);
+fn viewport(x: i32, y: i32, w: i32, h: i32) -> Matrix<4, 4> {
+    let mut m: Matrix<4, 4> = Matrix::identity();
     m[0][3] = (x + w) as f32 / 2.0;
     m[1][3] = (y + h) as f32 / 2.0;
     m[2][3] = DEPTH as f32 / 2.0;
@@ -75,13 +75,13 @@ fn viewport(x: i32, y: i32, w: i32, h: i32) -> Matrix {
     m
 }
 
-fn look_at(eye: Vector3D<f32>, center: Vector3D<f32>, up: Vector3D<f32>) -> Matrix {
+fn look_at(eye: Vector3D<f32>, center: Vector3D<f32>, up: Vector3D<f32>) -> Matrix<4, 4> {
     let z: Vector3D<f32> =  (eye - center).normalize(1.0);
     let x: Vector3D<f32> =  cross(up, z).normalize(1.0);
     let y: Vector3D<f32> =  cross(z, x).normalize(1.0);
 
-    let mut minv = Matrix::identity(4);
-    let mut tr = Matrix::identity(4);
+    let mut minv: Matrix<4, 4> = Matrix::identity();
+    let mut tr: Matrix<4, 4> = Matrix::identity();
 
     for i in 0..3 {
         minv[0][i] = x[i];

@@ -269,7 +269,7 @@ impl Scene {
 }
 
 fn get_color(color: u32, mut intensity: f32) -> u32{
-    // intensity = intensity.clamp(0.0, 1.0); 
+    intensity = intensity.clamp(0.0, 1.0); 
     
     let mut result = color as f32 * intensity;
     result += (color >> 8) as f32 *intensity * 256.0;
