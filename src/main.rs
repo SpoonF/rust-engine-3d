@@ -6,9 +6,10 @@ mod tga;
 mod shader;
 
 use std::{any::Any, path::Path};
-use sdl2::keyboard::Keycode;
+use image::Delay;
+use sdl2::keyboard::{Keycode, Mod};
 
-use crate::{geometry::{ Matrix, Vector2D, Vector3D}, model::Model, scene::Scene};
+use crate::{geometry::{ Matrix, Vector}, model::Model, scene::Scene};
 
 const WIDTH: usize = 1024;
 const HEIGHT: usize = 1024;
@@ -22,41 +23,43 @@ fn main() {
     model.read_texture(Path::new("obj/head.tga"));
     // let light_dir = Vector3D::new(1.0, -1.0, 1.0).normalize(1.0);
 
-    let light_dir: Vector3D<f32> = Vector3D::new(1., 1., 1.);
-    let eye: Vector3D<f32> = Vector3D::new(1.0, 1.0, 3.0);
-    let center: Vector3D<f32> = Vector3D::new(0.0, 0.0, 0.0);
-    let up: Vector3D<f32> = Vector3D::new(0.0, 1.0, 0.0);
+    let light_dir: Vector<3,f32> = Vector::new([1., -1., 1.]).normalize(1.);
+    let eye: Vector<3,f32> = Vector::new([1.0, 1.0, 3.0]);
+    let center: Vector<3,f32> = Vector::new([0.0, 0.0, 0.0]);
+    let up: Vector<3,f32> = Vector::new([0.0, 1.0, 0.0]);
 
     
+    let model_view: Matrix<4, 4> = look_at(eye, center, up);
+    let viewport: Matrix<4, 4> = viewport((WIDTH/8) as i32, (HEIGHT/8) as i32, (WIDTH*3/4) as i32, (HEIGHT*3/4) as i32);
+    let projection: Matrix<4, 4> = projection(-1./(eye-center).norm());
+    let light_dir = 
 
+    let shader = Shader::new(&model, &projection, &model_view);
 
     let mut scene = Scene::new(WIDTH, HEIGHT, DEPTH);
 
     scene.wait_for_exit(|scene: &mut Scene, keycodes| {
 
-        let model_view = look_at(eye, center, Vector3D::new(0.0, 1.0, 0.0));
-        let mut projection: Matrix<4, 4> = Matrix::identity();
-        let viewport = viewport((WIDTH/8) as i32, (HEIGHT/8) as i32, (WIDTH*3/4) as i32, (HEIGHT*3/4) as i32);
-        // projection[3][2] = -1./(eye-center).norm();
+
 
         let faces = &model.faces;
 
         for i in 0..faces.len() {
             let face = &faces[i];
-            let mut screen_coords: [Vector3D<i32>; 3] = [Vector3D::new(0, 0, 0);3];
-            let mut world_coords: [Vector3D<f32>; 3] = [Vector3D::new(0.0, 0.0, 0.0);3];
+            let mut screen_coords: [Vector<3,i32>; 3] = [Vector::new([0, 0, 0]);3];
+            let mut world_coords: [Vector<3,f32>; 3] = [Vector::new([0.0, 0.0, 0.0]);3];
             let mut intensity: [f32; 3] = [0.0; 3];
             for j in 0..3 {
 
-                let v: Vector3D<f32> = model.verticates[face[j].x as usize];
-                // let set = viewport.clone() * projection.clone() * model_view.clone() * Matrix::from(v);
-                let set = viewport.clone() * Matrix::from(v);
+                let v: Vector<3,f32> = model.verticates[face[j][0] as usize];
+                let set = viewport.clone() * projection.clone() * model_view.clone() * Matrix::from(v);
 
-                screen_coords[j] = Vector3D::from(set).cast();
+                screen_coords[j] = Vector::<3, f32>::from(set).cast();
                 world_coords[j] = v;
 
-                intensity[j] = model.norm(i as i32, j as i32) * light_dir;
+                intensity[j] = model.norm(i, j) * light_dir;
             }
+            
             scene.triangle_new(screen_coords,  intensity);
         }
     });
@@ -75,10 +78,10 @@ fn viewport(x: i32, y: i32, w: i32, h: i32) -> Matrix<4, 4> {
     m
 }
 
-fn look_at(eye: Vector3D<f32>, center: Vector3D<f32>, up: Vector3D<f32>) -> Matrix<4, 4> {
-    let z: Vector3D<f32> =  (eye - center).normalize(1.0);
-    let x: Vector3D<f32> =  cross(up, z).normalize(1.0);
-    let y: Vector3D<f32> =  cross(z, x).normalize(1.0);
+fn look_at(_eye: Vector<3, f32>, _center: Vector<3, f32>, _up: Vector<3, f32>) -> Matrix<4, 4> {
+    let z  =  (_eye - _center).normalize(1.0);
+    let x =  cross(_up, z).normalize(1.0);
+    let y =  cross(z, x).normalize(1.0);
 
     let mut minv: Matrix<4, 4> = Matrix::identity();
     let mut tr: Matrix<4, 4> = Matrix::identity();
@@ -87,16 +90,53 @@ fn look_at(eye: Vector3D<f32>, center: Vector3D<f32>, up: Vector3D<f32>) -> Matr
         minv[0][i] = x[i];
         minv[1][i] = y[i];
         minv[2][i] = z[i];
-        tr[i][3] = -center[i];
+        tr[i][3] = -_center[i];
     }
 
     minv * tr
 }
 
-fn cross(v1: Vector3D<f32>, v2: Vector3D<f32>) -> Vector3D<f32> {
-    Vector3D::new(
-        v1.y * v2.z - v1.z * v2.y,
-        -(v1.x * v2.z - v1.z * v2.x),
-        v1.x * v2.y - v1.y * v2.x
-    )
+fn cross(v1: Vector<3, f32>, v2: Vector<3, f32>) -> Vector<3, f32> {
+    Vector::new([
+        v1[1] * v2[2] - v1[2] * v2[1],
+        -(v1[0] * v2[2] - v1[2] * v2[0]),
+        v1[0] * v2[1] - v1[1] * v2[0]
+    ])
+}
+fn projection(coef: f32) -> Matrix<4, 4>{
+    let mut result: Matrix<4, 4> = Matrix::identity();
+    result[3][2] = coef;
+    result
+}
+
+struct Shader<'a> {
+    varing_uv: Matrix<2, 3>,
+    varing_tri: Matrix<4, 3>,
+    model: &'a Model,
+    projection: &'a Matrix<4,4>,
+    model_view: &'a Matrix<4,4>,
+}
+
+impl<'a>  Shader<'_> {
+    fn new(model: &'a Model, projection: &'a Matrix<4,4>, model_view: &'a Matrix<4,4>) -> Shader<'a> {
+        Shader {
+            varing_uv: Matrix::new(),
+            varing_tri: Matrix::new(),
+            model,
+            projection,
+            model_view
+        }
+    }
+    
+    fn vertex(&mut self, iface: usize, nthvert: usize) -> Vector<4,f32> {
+        self.varing_uv.set_col(nthvert, self.model.uv(iface, nthvert).cast());
+        let gl_vertex: Vector<4, f32> = self.projection.clone() * self.model_view.clone() * self.model.vert(iface, nthvert).embed_one::<4>();
+        self.varing_tri.set_col(nthvert, gl_vertex);
+        gl_vertex
+    }   
+    fn fragment(&self, bar: Vector<3, f32>, color: &mut u32) -> bool {
+        let uv = self.varing_uv.clone() * bar;
+        *color = self.model.diffuse(uv);
+        return false;
+    }
 }

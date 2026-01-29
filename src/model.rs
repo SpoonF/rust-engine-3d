@@ -2,14 +2,14 @@ use std::{fs::{self, File}, io::{BufRead, BufReader, Read}, path::Path};
 
 use image::{GenericImageView, ImageBuffer};
 
-use crate::{geometry::{Vector2D, Vector3D}, tga::Tga};
+use crate::{geometry::{Vector}, tga::Tga};
 
 #[derive(Clone)]
 pub struct Model {
-    pub verticates: Vec<Vector3D<f32>>,
-    pub faces: Vec<Vec<Vector3D<i32>>>,
-    pub uv: Vec<Vector2D<f32>>,
-    pub norms: Vec<Vector3D<f32>>,
+    pub verticates: Vec<Vector<3,f32>>,
+    pub faces: Vec<Vec<Vector<3,i32>>>,
+    pub uv: Vec<Vector<2,f32>>,
+    pub norms: Vec<Vector<3,f32>>,
     pub texture: Option<Tga>
 }
 
@@ -30,11 +30,11 @@ impl Model {
                 let parts: Vec<&str> = line.split_whitespace().collect();
 
                 verticates.push(
-                    Vector3D::new(
+                    Vector::new([
                         parts[1].parse::<f32>().unwrap(), 
                         parts[2].parse::<f32>().unwrap(), 
                         parts[3].parse::<f32>().unwrap() 
-                    )
+                    ])
                 );
             } else if line.starts_with("f ") {
                 let mut parts: Vec<&str> = line.split_whitespace().collect();
@@ -44,31 +44,31 @@ impl Model {
                 for part in parts {
                     let t: Vec<&str> = part.split("/").collect();
 
-                    x.push(Vector3D::new(
+                    x.push(Vector::new([
                         t[0].parse::<i32>().unwrap() - 1, 
                         t[1].parse::<i32>().unwrap() - 1, 
                         t[2].parse::<i32>().unwrap() - 1 
-                    ));
+                    ]));
                 }
                 faces.push(x);
             } else if line.starts_with("vt ") {
                 let parts: Vec<&str> = line.split_whitespace().collect();
 
                 uv.push(
-                    Vector2D::new(
+                    Vector::new([
                         parts[1].parse::<f32>().unwrap(), 
                         parts[2].parse::<f32>().unwrap(),
-                    )
+                    ])
                 );
             } else if line.starts_with("vn ") {
                 let parts: Vec<&str> = line.split_whitespace().collect();
 
                 norms.push(
-                    Vector3D::new(
+                    Vector::new([
                         parts[1].parse::<f32>().unwrap(), 
                         parts[2].parse::<f32>().unwrap(),
                         parts[3].parse::<f32>().unwrap(),
-                    )
+                    ])
                 );
             }
         }
@@ -85,29 +85,27 @@ impl Model {
         self.texture = Some(Tga::read_file(path));
         
     }
-    pub fn diffuse(&self, mut uv: Vector2D<i32>) -> u32 {
+    pub fn diffuse(&self, mut uvf: Vector<2, f32>) -> u32 {
         let texture = self.texture.as_ref().unwrap();
 
-        if texture.width() < uv.x as usize {
-            uv.x = (texture.width() - 1) as i32;
-        }
-        if texture.height() < uv.y as usize {
-            uv.y = (texture.height() - 1) as i32;
-        }
-        texture.get_pixel(uv.x, uv.y)
+        let uv = Vector::new([uvf[0] * texture.width() as f32, uvf[1] * texture.height() as f32]).cast::<i32>();
+        texture.get_pixel(uv[0], uv[1])
     }
-    pub fn uv(&self, iface: i32, nvert: i32) -> Vector2D<i32> {
-        let idx = self.faces[iface as usize][nvert as usize].y as usize;
+    pub fn uv(&self, iface: usize, nvert: usize) -> Vector<2, i32> {
+        let idx = self.faces[iface as usize][nvert as usize][1] as usize;
         let texture = self.texture.as_ref().unwrap();
-        Vector2D::new(
-            self.uv[idx].x * texture.width() as f32,  
-            self.uv[idx].y * texture.height() as f32
-        ).cast()
+        Vector::new([
+            self.uv[idx][0] * texture.width() as f32,  
+            self.uv[idx][1] * texture.height() as f32
+        ]).cast()
 
     }
-    pub fn norm(&self, iface: i32, nvert: i32) -> Vector3D<f32>{
+    pub fn norm(&self, iface: usize, nvert: usize) -> Vector<3,f32>{
         let idx = self.faces[iface as usize][nvert as usize][2];
         self.norms[idx as usize].normalize(1.0)
+    }
+    pub fn vert(&self, iface: usize, nvert: usize) -> Vector<3,f32> {
+        self.verticates[self.faces[iface][nvert][0] as usize]
     }
 }
 impl std::fmt::Debug for Model {

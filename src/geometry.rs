@@ -1,15 +1,41 @@
 use std::ops::{Add, BitXor, Index, IndexMut, Mul, Sub};
 
-use num::{Float, NumCast, zero};
+use num::{Float, NumCast};
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Vector<const N: usize, T> {
-    vec: [T; N]
+    pub(crate) vec: [T; N]
 }
 impl<const N: usize, T> Vector<N, T> {
     pub fn new(vec: [T; N]) -> Self {
         Vector { vec }
     }
+    pub fn empty() -> Self 
+    where T: num::Zero + Copy {
+        Vector { vec: [T::zero(); N] }
+    }
+    pub fn embed_one<const Nn: usize>(&self) -> Vector<Nn, T> 
+    where T: num::One + Copy {
+        let mut vec = [T::one(); Nn];
+
+        for i in 0..Nn {
+            vec[i] = self[i]
+        }
+        
+        Vector { vec }
+    }
+
+    pub fn embed_zero<const Nn: usize>(&self) -> Vector<Nn, T> 
+    where T: num::Zero + Copy {
+        let mut vec = [T::zero(); Nn];
+
+        for i in 0..Nn {
+            vec[i] = self[i]
+        }
+        
+        Vector { vec }
+    }
+    pub fn proj() {}
 }
 impl<const N: usize, T> Index<usize> for Vector<N, T> {
     type Output = T;
@@ -30,7 +56,7 @@ impl<const N: usize, T: NumCast + Copy> Vector<N, T> {
         let mut vec = [U::zero(); N];
 
         for (i, val) in self.vec.iter().enumerate() {
-            vec[i] = NumCast::from(*val).unwrap()
+            vec[i] = NumCast::from(*val).unwrap();
         }
     
         Vector { vec }
@@ -50,15 +76,15 @@ where f32: NumCast + Float{
     }
 }
 impl<const N: usize, T> Vector<N, T> 
-where T: Copy + Clone + Add<Output = T> + Mul<Output = T> + Float  {
+where T: Copy + Clone + Add<Output = T> + Mul<Output = T> + Float {
     pub fn norm(self) -> T
     {
-        let result = T::zero();
-        for (i, val) in self.vec.iter().enumerate() {
-            result.add(*val * *val);
+        let mut result = T::zero();
+        for val in self.vec.iter() {
+            result = result + (*val * *val);
         }
 
-        result
+        result.sqrt()
     }
     pub fn normalize(self, lenght: T) -> Vector<N, T>  
     {
@@ -144,420 +170,16 @@ where T: Mul<Output = T> + Sub<Output = T> + Copy + num::Zero
         Vector::new(vec)
     }
 }
-impl<const N: usize> Vector<N, f32> {
-    pub fn from(m: Matrix<N, 1>) -> Vector<N, f32> {
+impl<const N: usize, const MN: usize> From<Matrix<MN, 1>> for Vector<N, f32> {
+    fn from(m: Matrix<MN, 1>) -> Vector<N, f32> {
+        assert_eq!(N, MN - 1);
         let mut vec: [f32; N] = [0.0; N];
 
-        for i in 0..N - 1 {
-            vec[i] = m[i][0]/m[N - 1][0];
+        for i in 0..N {
+            vec[i] = m[i][0]/m[N][0];
         }
         
         Vector::new(vec)
-    }
-}
-//////////////////////////////////////////////////////////////
-#[derive(Debug, Clone, Copy)]
-pub struct Vector2D<T> {
-    pub x: T,
-    pub y: T,
-    
-}
-
-impl<T> Vector2D<T> {
-    
-    pub fn new(x: T, y: T) -> Vector2D<T> {
-        Vector2D { x, y}
-    }
-
-
-    pub fn x(self) -> T {
-        self.x
-    }
-    pub fn y(self) -> T {
-        self.y
-    }
-}
-
-impl<T: NumCast> Vector2D<T> {
-    // Метод для преобразования типа
-    pub fn cast<U: NumCast>(self) -> Vector2D<U>
-    {
-        Vector2D {
-            x: NumCast::from(self.x).unwrap(),
-            y: NumCast::from(self.y).unwrap(),
-        }
-    }
-}
-impl<f32> Vector2D<f32> 
-where f32: NumCast + Float{
-    pub fn round<U: NumCast>(self) -> Vector2D<U>
-    {
-        Vector2D {
-            x: NumCast::from(self.x.round()).unwrap(),
-            y: NumCast::from(self.y.round()).unwrap(),
-        }
-    }
-}
-impl<T: Add<Output = T>> Add for Vector2D<T> {
-    type Output = Vector2D<T>;
-
-    fn add(self, other: Vector2D<T>) -> Vector2D<T> {
-        Vector2D {
-            x: self.x + other.x,
-            y: self.y + other.y
-        }
-    }
-}
-
-impl<T: Sub<Output = T>> Sub for Vector2D<T>  {
-    type Output = Vector2D<T>;
-
-    fn sub(self, other: Vector2D<T>) -> Vector2D<T> {
-        Vector2D { 
-            x: self.x - other.x,
-            y: self.y - other.y 
-        }
-    }
-}
-
-impl<T: Mul<Output = T> + Clone> Mul<T> for Vector2D<T>  {
-    type Output = Vector2D<T>;
-
-    fn mul(self, other: T) -> Vector2D<T> {
-        Vector2D { 
-            x: self.x * other.clone(),
-            y: self.y * other.clone() 
-        }
-    }
-}
-impl<T: BitXor + Mul<Output = T> + Sub<Output = T> + Copy> BitXor for Vector2D<T> {
-    type Output = Vector2D<T>;
-
-    fn bitxor(self, other: Vector2D<T>) -> Vector2D<T> {
-        Vector2D {
-            x: self.y * other.x - self.x * other.y,
-            y: self.y * other.x - self.x * other.y,
-        }
-    }
-}
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#[derive(Debug, Clone, Copy)]
-pub struct Vector3D<T> {
-    pub x: T,
-    pub y: T,
-    pub z: T,
-}
-
-impl<T> Vector3D<T> {
-    pub fn new(x: T, y: T, z: T) -> Vector3D<T> {
-        Vector3D { x, y, z }
-    }
-    pub fn x(self) -> T {
-        self.x
-    }
-    pub fn y(self) -> T {
-        self.y
-    }
-    pub fn z(self) -> T {
-        self.z
-    }
-    fn _get_by_index(&self, index: usize) -> &T {
-
-        match index {
-            0 => &self.x,
-            1 => &self.y,
-            2 => &self.z,
-            _ => panic!("Undefinded index {} in Vector3D", index)
-        }
-    }
-
-    fn _get_by_index_mut(&mut self, index: usize) -> &mut T {
-
-        match index {
-            0 => &mut self.x,
-            1 => &mut self.y,
-            2 => &mut self.z,
-            _ => panic!("Undefinded index {} in Vector3D", index)
-        }
-    }
-}
-impl<T> Index<usize> for Vector3D<T> {
-    type Output = T;
-
-    fn index(&self, index: usize) -> &T {
-        self._get_by_index(index)
-    }
-}
-impl<T> IndexMut<usize> for Vector3D<T> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self._get_by_index_mut(index)
-    }
-}
-impl<T: NumCast> Vector3D<T> {
-    // Метод для преобразования типа
-    pub fn cast<U: NumCast>(self) -> Vector3D<U>
-    {
-        Vector3D {
-            x: NumCast::from(self.x).unwrap(),
-            y: NumCast::from(self.y).unwrap(),
-            z: NumCast::from(self.z).unwrap(),
-        }
-    }
-}
-impl<f32> Vector3D<f32> 
-where f32: NumCast + Float{
-    pub fn round<U: NumCast>(self) -> Vector3D<U>
-    {
-        Vector3D {
-            x: NumCast::from(self.x.round()).unwrap(),
-            y: NumCast::from(self.y.round()).unwrap(),
-            z: NumCast::from(self.z.round()).unwrap(),
-        }
-    }
-}
-impl<T> Vector3D<T> 
-where T: Copy + Add<Output = T> + Mul<Output = T> + Float + Copy {
-    pub fn norm(self) -> T
-    {
-        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
-    }
-    pub fn normalize(self, lenght: T) -> Vector3D<T>
-    {
-        self * (lenght / self.norm())
-    }
-}
-impl<T: Add<Output = T>> Add for Vector3D<T> {
-    type Output = Vector3D<T>;
-
-    fn add(self, other: Vector3D<T>) -> Vector3D<T> {
-        Vector3D {
-            x: self.x + other.x,
-            y: self.y + other.y,
-            z: self.z + other.z,
-        }
-    }
-}
-
-impl<T: Sub<Output = T>> Sub for Vector3D<T>  {
-    type Output = Vector3D<T>;
-
-    fn sub(self, other: Vector3D<T>) -> Vector3D<T> {
-        Vector3D { 
-            x: self.x - other.x,
-            y: self.y - other.y,
-            z: self.z - other.z,
-        }
-    }
-}
-
-impl<T: Mul<Output = T> + Clone> Mul<T> for Vector3D<T>  {
-    type Output = Vector3D<T>;
-
-    fn mul(self, other: T) -> Vector3D<T> {
-        Vector3D { 
-            x: self.x * other.clone(),
-            y: self.y * other.clone(),
-            z: self.z * other.clone(),
-        }
-    }
-}
-impl<T> Mul for Vector3D<T>
-where T: Mul<Output = T> + Add<Output = T>{
-    type Output = T;
-
-    fn mul(self, other: Vector3D<T>) -> T {
-        self.x * other.x + self.y * other.y + self.z * other.z
-    }
-}
-
-impl<T> BitXor for Vector3D<T> 
-where T: Mul<Output = T> + Sub<Output = T> + Copy
-{
-    type Output = Vector3D<T>;
-
-    fn bitxor(self, other: Vector3D<T>) -> Self::Output {
-        Vector3D {
-            x: self.y * other.z - self.z * other.y,
-            y: self.z * other.x - self.x * other.z,
-            z: self.x * other.y - self.y * other.x,
-        }
-    }
-}
-
-impl Vector3D<f32> {
-    pub fn from(m: Matrix<4, 1>) -> Vector3D<f32> {
-        Vector3D::new(
-            m[0][0]/m[3][0], 
-            m[1][0]/m[3][0], 
-            m[2][0]/m[3][0]
-        )
-    }
-}
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#[derive(Debug, Clone, Copy)]
-pub struct Vector4D<T> {
-    pub x: T,
-    pub y: T,
-    pub z: T,
-    pub t: T
-}
-
-impl<T> Vector4D<T> {
-    pub fn new(x: T, y: T, z: T, t: T) -> Vector4D<T> {
-        Vector4D { x, y, z , t}
-    }
-    pub fn x(self) -> T {
-        self.x
-    }
-    pub fn y(self) -> T {
-        self.y
-    }
-    pub fn z(self) -> T {
-        self.z
-    }
-
-    pub fn t(self) -> T {
-        self.t
-    }
-    fn _get_by_index(&self, index: usize) -> &T {
-
-        match index {
-            0 => &self.x,
-            1 => &self.y,
-            2 => &self.z,
-            3 => &self.t,
-            _ => panic!("Undefinded index {} in Vector4D", index)
-        }
-    }
-
-    fn _get_by_index_mut(&mut self, index: usize) -> &mut T {
-
-        match index {
-            0 => &mut self.x,
-            1 => &mut self.y,
-            2 => &mut self.z,
-            3 => &mut self.t,
-            _ => panic!("Undefinded index {} in Vector4D", index)
-        }
-    }
-}
-impl<T> Index<usize> for Vector4D<T> {
-    type Output = T;
-
-    fn index(&self, index: usize) -> &T {
-        self._get_by_index(index)
-    }
-}
-impl<T> IndexMut<usize> for Vector4D<T> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self._get_by_index_mut(index)
-    }
-}
-impl<T: NumCast> Vector4D<T> {
-    // Метод для преобразования типа
-    pub fn cast<U: NumCast>(self) -> Vector4D<U>
-    {
-        Vector4D {
-            x: NumCast::from(self.x).unwrap(),
-            y: NumCast::from(self.y).unwrap(),
-            z: NumCast::from(self.z).unwrap(),
-            t: NumCast::from(self.t).unwrap(),
-        }
-    }
-}
-impl<f32> Vector4D<f32> 
-where f32: NumCast + Float{
-    pub fn round<U: NumCast>(self) -> Vector4D<U>
-    {
-        Vector4D {
-            x: NumCast::from(self.x.round()).unwrap(),
-            y: NumCast::from(self.y.round()).unwrap(),
-            z: NumCast::from(self.z.round()).unwrap(),
-            t: NumCast::from(self.t.round()).unwrap(),
-        }
-    }
-}
-impl<T> Vector4D<T> 
-where T: Copy + Add<Output = T> + Mul<Output = T> + Float + Copy {
-    pub fn norm(self) -> T
-    {
-        (self.x * self.x + self.y * self.y + self.z * self.z + self.t * self.t).sqrt()
-    }
-    pub fn normalize(self, lenght: T) -> Vector4D<T>
-    {
-        self * (lenght / self.norm())
-    }
-}
-impl<T: Add<Output = T>> Add for Vector4D<T> {
-    type Output = Vector4D<T>;
-
-    fn add(self, other: Vector4D<T>) -> Vector4D<T> {
-        Vector4D {
-            x: self.x + other.x,
-            y: self.y + other.y,
-            z: self.z + other.z,
-            t: self.t + other.t,
-        }
-    }
-}
-
-impl<T: Sub<Output = T>> Sub for Vector4D<T>  {
-    type Output = Vector4D<T>;
-
-    fn sub(self, other: Vector4D<T>) -> Vector4D<T> {
-        Vector4D { 
-            x: self.x - other.x,
-            y: self.y - other.y,
-            z: self.z - other.z,
-            t: self.t - other.t,
-        }
-    }
-}
-
-impl<T: Mul<Output = T> + Clone> Mul<T> for Vector4D<T>  {
-    type Output = Vector4D<T>;
-
-    fn mul(self, other: T) -> Vector4D<T> {
-        Vector4D { 
-            x: self.x * other.clone(),
-            y: self.y * other.clone(),
-            z: self.z * other.clone(),
-            t: self.t * other.clone(),
-        }
-    }
-}
-impl<T> Mul for Vector4D<T>
-where T: Mul<Output = T> + Add<Output = T>{
-    type Output = T;
-
-    fn mul(self, other: Vector4D<T>) -> T {
-        self.x * other.x + self.y * other.y + self.z * other.z + self.t * other.t
-    }
-}
-
-impl<T> BitXor for Vector4D<T> 
-where T: Mul<Output = T> + Sub<Output = T> + Copy
-{
-    type Output = Vector4D<T>;
-
-    fn bitxor(self, other: Vector4D<T>) -> Self::Output {
-        Vector4D {
-            x: self.y * other.z - self.z * other.y,
-            y: self.z * other.t - self.t * other.z,
-            z: self.t * other.x - self.x * other.t,
-            t: self.x * other.y - self.y * other.x,
-        }
-    }
-}
-
-impl Vector4D<f32> {
-    pub fn from(m: Matrix<5, 1>) -> Vector4D<f32> {
-        Vector4D::new(
-            m[0][0]/m[4][0], 
-            m[1][0]/m[4][0], 
-            m[2][0]/m[4][0],
-            m[3][0]/m[4][0],
-        )
     }
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -592,9 +214,12 @@ impl<const ROWS: usize, const COLS: usize> Matrix<ROWS, COLS> {
         m
     }
     
-    // pub fn set_col(&self, idx: usize, v: V) {
-    //     todo!()
-    // }
+    pub fn set_col(&mut self, idx: usize, v: Vector<ROWS, f32>) {
+        assert!(idx < ROWS);
+        for i in ROWS..0 {
+            self[i][idx] = v[i];
+        }
+    }
 }
 impl<const N: usize> Matrix<N, N> {
     /// Вычисляет обратную матрицу методом Гаусса-Жордана
@@ -662,8 +287,8 @@ impl<const N: usize> Matrix<N, N> {
 
     pub fn identity() -> Matrix<N, N> {
         let mut m: Matrix<N, N> = Matrix::new();
-        for i in 0..N as usize {
-            for j in 0..N as usize {
+        for i in 0..N {
+            for j in 0..N  {
                 m[i][j] = if i == j { 1.0 } else { 0.0 }
             }
         }
@@ -673,7 +298,8 @@ impl<const N: usize> Matrix<N, N> {
 }
 
 
-impl<const ROWS: usize, const COLS: usize>  Index<usize> for Matrix<ROWS, COLS> {
+impl<const ROWS: usize, const COLS: usize>  
+Index<usize> for Matrix<ROWS, COLS> {
     type Output = [f32; COLS];
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -681,13 +307,15 @@ impl<const ROWS: usize, const COLS: usize>  Index<usize> for Matrix<ROWS, COLS> 
     }
 }
 
-impl<const ROWS: usize, const COLS: usize>  IndexMut<usize> for Matrix<ROWS, COLS> {
+impl<const ROWS: usize, const COLS: usize>  
+IndexMut<usize> for Matrix<ROWS, COLS> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.matrix[index]
     }
 }
 
-impl<const ROWS: usize, const COLS: usize, const N: usize> Mul<Matrix<COLS, N>> for Matrix<ROWS, COLS> 
+impl<const ROWS: usize, const COLS: usize, const N: usize> 
+Mul<Matrix<COLS, N>> for Matrix<ROWS, COLS> 
 {
     type Output = Matrix<COLS, N>;
 
@@ -706,14 +334,37 @@ impl<const ROWS: usize, const COLS: usize, const N: usize> Mul<Matrix<COLS, N>> 
         m
     }
 }
+impl<const ROWS: usize, const COLS: usize> 
+    Mul<Vector<COLS, f32>> for Matrix<ROWS, COLS> 
+{
+    type Output = Vector<ROWS, f32>;
 
-impl Matrix<4, 1> {
-    pub fn from(v: Vector3D<f32>) -> Matrix<4, 1> {
-        let mut m: Matrix<4, 1> = Matrix::new();
-        m[0][0] = v.x;
-        m[1][0] = v.y;
-        m[2][0] = v.x;
-        m[3][0] = 1.0;
+    fn mul(self, vec: Vector<COLS, f32>) -> Self::Output {
+        let mut result = Vector::<ROWS, f32>::empty(); // или new()
+        
+        for i in 0..ROWS {  // Для каждой строки матрицы
+            let mut sum = 0.0;
+            
+            for j in 0..COLS {  // Для каждого элемента в строке
+                sum += self[i][j] * vec.vec[j];
+            }
+            
+            result.vec[i] = sum;
+        }
+        
+        result
+    }
+}
+
+impl<const N: usize, const VN: usize> From<Vector<VN, f32>> for Matrix<N, 1> {
+    fn from(v: Vector<VN, f32>) -> Matrix<N, 1> 
+    {
+        assert_eq!(N, VN + 1);
+        let mut m: Matrix<N, 1> = Matrix::new();
+        for i in 0..VN {
+            m[i][0] = v[i];
+        }
+        m[VN][0] = 1.0;
         m
     }
 }
