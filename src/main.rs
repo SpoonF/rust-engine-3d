@@ -32,35 +32,23 @@ fn main() {
     let model_view: Matrix<4, 4> = look_at(eye, center, up);
     let viewport: Matrix<4, 4> = viewport((WIDTH/8) as i32, (HEIGHT/8) as i32, (WIDTH*3/4) as i32, (HEIGHT*3/4) as i32);
     let projection: Matrix<4, 4> = projection(-1./(eye-center).norm());
-    let light_dir = 
+    let light_dir = (projection.clone() * model_view.clone() * light_dir.embed::<4>(0.0)).proj::<3>().normalize(1.);
 
-    let shader = Shader::new(&model, &projection, &model_view);
+    
 
     let mut scene = Scene::new(WIDTH, HEIGHT, DEPTH);
 
     scene.wait_for_exit(|scene: &mut Scene, keycodes| {
 
 
-
+        let mut shader = Shader::new(&model, &projection, &model_view);
         let faces = &model.faces;
 
         for i in 0..faces.len() {
-            let face = &faces[i];
-            let mut screen_coords: [Vector<3,i32>; 3] = [Vector::new([0, 0, 0]);3];
-            let mut world_coords: [Vector<3,f32>; 3] = [Vector::new([0.0, 0.0, 0.0]);3];
-            let mut intensity: [f32; 3] = [0.0; 3];
             for j in 0..3 {
-
-                let v: Vector<3,f32> = model.verticates[face[j][0] as usize];
-                let set = viewport.clone() * projection.clone() * model_view.clone() * Matrix::from(v);
-
-                screen_coords[j] = Vector::<3, f32>::from(set).cast();
-                world_coords[j] = v;
-
-                intensity[j] = model.norm(i, j) * light_dir;
+                shader.vertex(i, j);
             }
-            
-            scene.triangle_new(screen_coords,  intensity);
+            scene.triangle(&shader.varing_tri,  &shader, &viewport);
         }
     });
 }
@@ -118,7 +106,7 @@ struct Shader<'a> {
 }
 
 impl<'a>  Shader<'_> {
-    fn new(model: &'a Model, projection: &'a Matrix<4,4>, model_view: &'a Matrix<4,4>) -> Shader<'a> {
+    pub fn new(model: &'a Model, projection: &'a Matrix<4,4>, model_view: &'a Matrix<4,4>) -> Shader<'a> {
         Shader {
             varing_uv: Matrix::new(),
             varing_tri: Matrix::new(),
@@ -128,15 +116,15 @@ impl<'a>  Shader<'_> {
         }
     }
     
-    fn vertex(&mut self, iface: usize, nthvert: usize) -> Vector<4,f32> {
+    pub fn vertex(&mut self, iface: usize, nthvert: usize) -> Vector<4,f32> {
         self.varing_uv.set_col(nthvert, self.model.uv(iface, nthvert).cast());
-        let gl_vertex: Vector<4, f32> = self.projection.clone() * self.model_view.clone() * self.model.vert(iface, nthvert).embed_one::<4>();
+        let gl_vertex: Vector<4, f32> = self.projection.clone() * self.model_view.clone() * self.model.vert(iface, nthvert).embed::<4>(1.0);
         self.varing_tri.set_col(nthvert, gl_vertex);
         gl_vertex
     }   
-    fn fragment(&self, bar: Vector<3, f32>, color: &mut u32) -> bool {
+    pub fn fragment(&self, bar: Vector<3, f32>, color: &mut u32) -> bool {
         let uv = self.varing_uv.clone() * bar;
         *color = self.model.diffuse(uv);
-        return false;
+        false
     }
 }

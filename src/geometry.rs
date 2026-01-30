@@ -1,4 +1,4 @@
-use std::ops::{Add, BitXor, Index, IndexMut, Mul, Sub};
+use std::{ops::{Add, BitXor, Div, Index, IndexMut, Mul, Sub}, usize};
 
 use num::{Float, NumCast};
 
@@ -14,28 +14,31 @@ impl<const N: usize, T> Vector<N, T> {
     where T: num::Zero + Copy {
         Vector { vec: [T::zero(); N] }
     }
-    pub fn embed_one<const Nn: usize>(&self) -> Vector<Nn, T> 
+    pub fn embed<const C: usize>(&self, fill: T) -> Vector<C, T> 
     where T: num::One + Copy {
-        let mut vec = [T::one(); Nn];
 
-        for i in 0..Nn {
+        assert!(C > N);
+        let mut vec = [fill; C];
+
+        for i in 0..N {
             vec[i] = self[i]
         }
         
         Vector { vec }
     }
-
-    pub fn embed_zero<const Nn: usize>(&self) -> Vector<Nn, T> 
+    pub fn proj<const C: usize>(&self) -> Vector<C, T> 
     where T: num::Zero + Copy {
-        let mut vec = [T::zero(); Nn];
-
-        for i in 0..Nn {
+        assert!(C < N);
+        let mut vec: Vector<C, T> = Vector::empty();
+        for i in 0..C {
             vec[i] = self[i]
         }
-        
-        Vector { vec }
+
+        vec 
     }
-    pub fn proj() {}
+    pub fn len(&self) -> usize{
+        N
+    }
 }
 impl<const N: usize, T> Index<usize> for Vector<N, T> {
     type Output = T;
@@ -151,6 +154,21 @@ where T: Mul<Output = T> + Add<Output = T> + num::Zero + Copy{
 
     }
 }
+impl<const N: usize, T> Div<T> for Vector<N, T>  
+where T: Div<Output = T> + Clone + Copy + num::Zero {
+    type Output = Vector<N, T>;
+
+    fn div(self, other: T) -> Self::Output {
+
+        let mut vec: [T; N] = [T::zero(); N];
+
+        for i in 0..N {
+            vec[i] = self[i] / other;
+        }
+
+        Vector { vec }
+    }
+}
 
 impl<const N: usize, T> BitXor for Vector<N, T> 
 where T: Mul<Output = T> + Sub<Output = T> + Copy + num::Zero
@@ -185,7 +203,7 @@ impl<const N: usize, const MN: usize> From<Matrix<MN, 1>> for Vector<N, f32> {
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #[derive(Debug, Clone)]
 pub struct Matrix<const ROWS: usize, const COLS: usize> {
-    matrix: [[f32; COLS]; ROWS],
+    matrix: [Vector<COLS, f32>; ROWS],
     rows: usize,
     cols: usize,
 }
@@ -193,7 +211,7 @@ pub struct Matrix<const ROWS: usize, const COLS: usize> {
 impl<const ROWS: usize, const COLS: usize> Matrix<ROWS, COLS> {
     pub fn new() -> Self {
         Matrix { 
-            matrix: [[0.0; COLS]; ROWS], 
+            matrix: [Vector::empty(); ROWS], 
             rows: ROWS, 
             cols: COLS
         }
@@ -204,18 +222,24 @@ impl<const ROWS: usize, const COLS: usize> Matrix<ROWS, COLS> {
     pub fn ncols(&self) -> usize {
         self.matrix[0].len()
     }
+    pub fn col(&self, idx: usize) -> Vector<ROWS, f32> {
+        assert!(idx < COLS);
+        let mut vec: Vector<ROWS, f32> = Vector::empty();
+        for i in 0..ROWS {
+            vec[i] = self[i][idx];
+        }
+        vec
+    }
     pub fn trunspose(&self) -> Matrix<COLS, ROWS> {
         let mut m: Matrix<COLS, ROWS> = Matrix::new();
-        for i in  0..ROWS {
-            for j in  0..COLS {
-                m[j][i] = self[i][i];
-            }
+        for i in  0..COLS {
+            m[i] = self.col(i);
         }
         m
     }
     
     pub fn set_col(&mut self, idx: usize, v: Vector<ROWS, f32>) {
-        assert!(idx < ROWS);
+        assert!(idx < COLS);
         for i in ROWS..0 {
             self[i][idx] = v[i];
         }
@@ -300,7 +324,7 @@ impl<const N: usize> Matrix<N, N> {
 
 impl<const ROWS: usize, const COLS: usize>  
 Index<usize> for Matrix<ROWS, COLS> {
-    type Output = [f32; COLS];
+    type Output = Vector<COLS, f32>;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.matrix[index]
