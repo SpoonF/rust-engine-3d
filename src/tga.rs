@@ -1,4 +1,6 @@
-use std::{fs::File, io::{BufReader, Read}, mem, path::Path};
+use std::{fs::File, io::{BufReader, Read}, mem, ops::{Index, Mul}, path::Path, process::Output};
+
+use num::Float;
 #[derive(Clone)]
 pub struct Tga {
     pub map: Vec<Vec<u32>>,

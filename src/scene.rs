@@ -1,9 +1,9 @@
 
 use sdl2::{Sdl, event::Event, keyboard::Keycode, pixels::{Color, PixelFormatEnum}, rect::Rect, render::{Canvas, TextureCreator}, video::{Window, WindowContext} };
 use std::mem;
-use crate::{Shader, geometry::{Matrix, Vector}, model::Model};
+use crate::{Shader, geometry::{Matrix, Vector}, model::Model, our_gl::utils::{barycentric, get_color_rgba, get_rgba}};
 pub struct Scene {
-    scene: Vec<Vec<u32>>,
+    pub scene: Vec<Vec<u32>>,
     zbuffer: Vec<f32>,
     canvas: Canvas<Window>,
     texture_creator: TextureCreator<WindowContext>,
@@ -67,48 +67,53 @@ impl Scene {
     pub fn set(&mut self, x: usize, y: usize, color: u32) {
         self.scene[x][y] = color;
     }
-    pub fn triangle(&mut self, clipc: &Matrix<4, 3>, shader: &Shader, viewport: &Matrix<4, 4>) {
-        let pts: Matrix<3, 4> = (viewport.clone() * clipc.clone()).trunspose();
-        let mut pts2: Matrix<3, 2> = Matrix::new();
-
-        for i in 0..3 {
-            pts2[i] = (pts[i] / pts[i][3]).proj::<2>();
-        }                
-        println!("{:?}", clipc.clone());
+    pub fn triangle(&mut self, pts: Vec<Vector<4, f32>>, shader: &Shader, viewport: &Matrix<4, 4>) {        
 
         let mut bboxmin = Vector::new([f32::MAX, f32::MAX]);
         let mut bboxmax = Vector::new([-f32::MAX, -f32::MAX]);
-        let clamp = Vector::new([(self.width - 1) as f32, (self.height - 1) as f32]);
-
+        
         for i in 0..3 {
             for j in 0..2 {
-                bboxmin[j] = 0.0_f32.max(bboxmin[j].min(pts2[i][j]));
-                bboxmax[j] = clamp[j].min(bboxmax[j].max(pts2[i][j]));
+                bboxmin[j] = bboxmin[j].min(pts[i][j] / pts[i][3]);
+                bboxmax[j] = bboxmax[j].max(pts[i][j] / pts[i][3]);
             }
         }
 
         let mut p = Vector::new([bboxmin[0], bboxmin[1]]);
-        let mut color = 0;
+        let mut color = get_rgba(0xFFFFFF);
 
 
         while p[0] <= bboxmax[0] {
             while p[1] <= bboxmax[1] {
-                let bc_screen = barycentric(pts2[0], pts2[1], pts2[2], p);
-                let mut bc_clip = Vector::new([bc_screen[0]/pts[0][3], bc_screen[1]/pts[1][3], bc_screen[2]/pts[2][3]]);
-                bc_clip = bc_clip/(bc_clip[1] + bc_clip[1] + bc_clip[0]);
-                let frag_depth = clipc[2] * bc_clip;
+                let c = barycentric(
+                    (pts[0]/pts[0][3]).proj::<2>(), 
+                    (pts[1]/pts[1][3]).proj::<2>(), 
+                    (pts[2]/pts[2][3]).proj::<2>(), 
+                    p
+                );
 
-                if (bc_screen[0] < 0.0 || 
-                        bc_screen[1] < 0.0 || 
-                            bc_screen[2] < 0.0 || 
-                                self.zbuffer[(p[0] + p[1] * self.width as f32) as usize] > frag_depth) {
-                        continue;
-                    }
-                let discard = shader.fragment(bc_clip, &mut color);
+                let z = pts[0][2] * c.x() + pts[1][2] * c.y() + pts[2][2] * c.z();
+                let w = pts[0][3] * c.x() + pts[1][3] * c.y() + pts[2][3] * c.z();
+
+                let frag_depth = z / w;
+                
+                if c[0] < 0.0 || 
+                        c[1] < 0.0 || 
+                            c[2] < 0.0 || 
+                                self.zbuffer[(p[0] + p[1] * self.width as f32) as usize] > frag_depth 
+                {
+                    p[1] += 1.0;
+                    continue;
+                }
+
+                let discard = shader.fragment(c, &mut color);
+                
                 if !discard {
                     self.zbuffer[(p[0] + p[1] * self.width as f32) as usize] = frag_depth;
-                    self.set(p[0] as usize, p[1] as usize, color);
+                    self.set(p[0] as usize, p[1] as usize, get_color_rgba(color));
                 }
+
+                
 
                 p[1] += 1.0;
             }
@@ -120,7 +125,7 @@ impl Scene {
         // let mut rng = rand::rng();
         'running: loop {
             let mut keys:Vec<Keycode> = vec![];
-            let mut mouse: Vec<Keycode> = vec![];
+            let mouse: Vec<Keycode> = vec![];
 
             for event in event_pump.poll_iter() {
                 
@@ -137,40 +142,8 @@ impl Scene {
             }
 
             action(self, keys);
-            self.update();
+            // self.update();
         }
-    }
-}
-
-fn get_color(color: u32, mut intensity: f32) -> u32{
-    intensity = intensity.clamp(0.0, 1.0); 
-
-    let mut result = (color as f32*intensity) as u32;
-    result += (color as f32*intensity) as u32*256;
-    result += (color as f32*intensity) as u32*256*256;
-    result
-}
-fn get_color_from_rgb(color: [u8; 3], intensity: f32) -> u32{
-    let mut result = (color[2] as f32*intensity) as u32;
-    result += (color[1] as f32*intensity) as u32*256;
-    result += (color[0] as f32*intensity) as u32*256*256;
-    result
-}
-
-fn barycentric(a: Vector<2, f32>, b: Vector<2, f32>, c: Vector<2, f32>, p: Vector<2, f32>) -> Vector<3, f32> {
-    let mut s: [Vector<3, f32>; 2] = [Vector::empty(), Vector::empty()];
-
-    for i in 0..2 {
-        s[i][0] = c[i] - a[i];
-        s[i][1] = b[i] - a[i];
-        s[i][2] = a[i] - p[i];
-    }
-    let u = cross(s[0], s[1]);
-
-    if u[2].abs() > 1e-2 {
-        Vector::new([1.0-(u[0] + u[1])/u[2], u[1]/u[2], u[0]/u[2]])
-    } else {
-        Vector::new([-1.0, 1.0, 1.0])
     }
 }
 
