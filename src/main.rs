@@ -1,3 +1,4 @@
+#![feature(generic_const_exprs)]
 mod model;
 mod geometry;
 mod scene;
