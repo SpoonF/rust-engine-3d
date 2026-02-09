@@ -125,21 +125,21 @@ impl<'a>  Shader<'_> {
     pub fn vertex(&mut self, iface: usize, nthvert: usize) -> Vector<4,f32> {
         self.varing_uv.set_col(nthvert, self.model.uv(iface, nthvert).cast());
         
-        let gl_vertex: Vector<4, f32> = self.projection.clone() * self.model_view.clone() * self.model.vert(iface, nthvert).embed::<4>(1.0);
+        let gl_vertex: Vector<4, f32> = *self.projection * *self.model_view * self.model.vert(iface, nthvert).embed::<4>(1.0);
         self.varing_tri.set_col(nthvert, (gl_vertex/gl_vertex[3]).proj::<3>());
         gl_vertex
     }  
 
     pub fn fragment(&self, bar: Vector<3, f32>, color: &mut [u8; 4] ) -> bool {
-        let mut sb_p = self.uniform_ms.clone() * (self.varing_tri.clone() * bar).embed(1.0);
+        let mut sb_p = self.uniform_ms * (self.varing_tri * bar).embed(1.0);
         sb_p = sb_p/sb_p[3];
 
         let idx = sb_p[0] as usize + sb_p[1] as usize * WIDTH;
         let shadow = 0.3 + 0.7 * ((self.shadowbuffer[idx] < sb_p[2]) as i32) as f32;
 
-        let uv = self.varing_uv.clone() * bar;
-        let n = (self.uniform_mit.clone() * self.model.normal(uv).embed::<4>(1.0)).proj::<3>().normalize(1.);
-        let l = (self.uniform_m.clone() * self.light_dir.embed::<4>(1.0)).proj::<3>().normalize(1.);
+        let uv = self.varing_uv * bar;
+        let n = (self.uniform_mit * self.model.normal(uv).embed::<4>(1.0)).proj::<3>().normalize(1.);
+        let l = (self.uniform_m * self.light_dir.embed::<4>(1.0)).proj::<3>().normalize(1.);
         let r = (n * (n * l * 2.0) - l).normalize(1.0);
 
         let spec = f32::powf(r.z().max(0.0), self.model.specular(uv));

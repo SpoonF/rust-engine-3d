@@ -1,7 +1,7 @@
 
 use sdl2::{Sdl, event::Event, keyboard::Keycode, pixels::{Color, PixelFormatEnum}, rect::Rect, render::{Canvas, TextureCreator}, video::{Window, WindowContext} };
 use std::mem;
-use crate::{Shader, geometry::{Matrix, Vector}, model::Model, our_gl::utils::{barycentric, get_color_rgba, get_rgba}};
+use crate::{Shader, geometry::{Matrix, Vector}, model::Model, our_gl::utils::{barycentric, get_color_rgba, get_rgba, get_color_rgb}};
 pub struct Scene {
     pub scene: Vec<Vec<u32>>,
     zbuffer: Vec<f32>,
@@ -67,7 +67,7 @@ impl Scene {
     pub fn set(&mut self, x: usize, y: usize, color: u32) {
         self.scene[x][y] = color;
     }
-    pub fn triangle(&mut self, pts: Vec<Vector<4, f32>>, shader: &Shader, viewport: &Matrix<4, 4>) {        
+    pub fn triangle(&mut self, pts: Vec<Vector<4, f32>>, shader: &Shader) {        
 
         let mut bboxmin = Vector::new([f32::MAX, f32::MAX]);
         let mut bboxmax = Vector::new([-f32::MAX, -f32::MAX]);

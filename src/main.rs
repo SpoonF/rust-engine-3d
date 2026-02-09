@@ -1,4 +1,4 @@
-#![feature(generic_const_exprs)]
+
 mod model;
 mod geometry;
 mod scene;
@@ -43,8 +43,8 @@ fn main() {
         &model_view, 
         &light_dir, 
         model_view, 
-        (projection * model_view).invert_transpose(), 
-        m * m.invert()
+        (projection * model_view).transpose().inverse().unwrap(), 
+        m * m.inverse().unwrap()
     );
     let mut screen_coords: Vec<Vector<4, f32>> = vec![Vector::empty(); 3];
     let faces = &model.faces;
@@ -53,7 +53,7 @@ fn main() {
         for j in 0..3 {
             screen_coords[j] = shader.vertex(i, j);
         }
-        scene.triangle(screen_coords.clone(),  &shader, &viewport);
+        scene.triangle(screen_coords.clone(),  &shader);
     }
 
     scene.update();

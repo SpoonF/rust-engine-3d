@@ -271,76 +271,8 @@ impl<const ROWS: usize, const COLS: usize> Matrix<ROWS, COLS> {
     }
 }
 
-trait minor<const N: usize> {
+impl<const N: usize> Matrix<N, N> {
     const MINOR_SIZE: usize = N - 1;
-    type Output;
-    type OutputMinor;
-
-    fn det(&self) -> f32;
-    fn get_minor(&self, row: usize, col: usize) -> Self::OutputMinor;
-    fn cofactor(&self, row: usize, col: usize) -> f32;
-    fn abjugate(&self) -> Self::Output;
-    fn invert_transpose(&self) -> Self::Output;
-    fn invert(&self) -> Self::Output;
-}
-impl<const N: usize> minor<N> for Matrix<N, N> 
-where [(); Self::MINOR_SIZE]:{
-    const MINOR_SIZE: usize = N - 1;
-    type Output = Matrix<N, N>;
-    type OutputMinor = Matrix<{Self::MINOR_SIZE}, {Self::MINOR_SIZE}>;
-    
-    
-    fn det(&self) -> f32 {
-        if N == 1 {
-            return self[0][0];
-        }
-
-        let mut ret: f32 = 0.0;
-        for i in 0..N {
-            ret += self[0][i] * self.cofactor(0, i);
-        }
-        ret
-    }
-    fn get_minor(&self, row: usize, col: usize) -> Self::OutputMinor 
-    where {
-
-        let mut ret: Matrix<{Self::MINOR_SIZE}, {Self::MINOR_SIZE}> = Matrix::new();
-        for i in 0..Self::MINOR_SIZE {
-            for j in 0..Self::MINOR_SIZE {
-                let src_i = if i < row { i } else { i + 1 };
-                let src_j = if j < col { j } else { j + 1 };
-                
-                ret[i][j] = self[src_i][src_j];
-            }
-        }
-        ret
-    }
-    fn cofactor(&self, row: usize, col: usize) -> f32 
-    where [(); Self::MINOR_SIZE]:, [(); Self::MINOR_SIZE]:{
-        let sign: f32 = if (row + col).is_multiple_of(2) { 1.0 } else { -1.0 };
-
-        self.get_minor(row, col).det() * sign
-    }
-    fn abjugate(&self) -> Self 
-    where [(); Self::MINOR_SIZE]:{
-        let mut ret = Self::new();
-        for i in 0..N {
-            for j in 0..N {
-                ret[i][j] = self.cofactor(i, j)
-            }
-        }
-        ret
-    }
-    fn invert_transpose(&self) -> Self
-    where [(); Self::MINOR_SIZE]: {
-        let ret = self.abjugate();
-        let tmp = ret[0] * self[0];
-        ret/tmp
-    }
-    fn invert(&self) -> Self 
-    where [(); Self::MINOR_SIZE]:{
-        self.invert_transpose().trunspose()
-    }
 }
 
 impl<const N: usize> Matrix<N, N> {
@@ -419,8 +351,19 @@ impl<const N: usize> Matrix<N, N> {
 
         m
     }
-}
 
+    pub fn transpose(&self) -> Self {
+        let mut mat = Matrix::new();
+        
+        for i in 0..N {
+            for j in 0..N {
+                mat[i][j] = self[j][i];
+            }
+        }
+
+        mat
+    }
+}
 
 impl<const ROWS: usize, const COLS: usize>  
 Index<usize> for Matrix<ROWS, COLS> {

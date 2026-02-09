@@ -91,9 +91,7 @@ impl Model {
     }
     pub fn diffuse(&self, mut uvf: Vector<2, f32>) -> [u8; 4] {
         let texture = self.diffusemap.as_ref().unwrap();
-        println!("{:?}", uvf);
         let uv = Vector::new([uvf[0] * texture.width() as f32, uvf[1] * texture.height() as f32]).cast::<i32>();
-        println!("{:?}", uv);
         get_rgba(texture.get_pixel(uv[0], uv[1]))
     }
     pub fn uv(&self, iface: usize, nvert: usize) -> Vector<2, f32> {
